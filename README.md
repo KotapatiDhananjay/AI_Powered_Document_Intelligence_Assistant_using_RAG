@@ -1,86 +1,332 @@
 # AI Powered Document Intelligence Assistant using RAG
 
-An intelligent web application that empowers users to seamlessly interact with their documents using advanced Retrieval-Augmented Generation (RAG). The assistant provides accurate, grounded answers to questions by combining semantic search, keyword search, and cross-encoder reranking. 
+## Overview
 
-## 🌟 Key Features
+AI Powered Document Intelligence Assistant is an intelligent web application that allows users to interact with their documents using Retrieval-Augmented Generation (RAG).
 
-- **Document Q&A (RAG):** Ask questions and get precise answers derived directly from your uploaded documents, complete with source citations and page numbers.
-- **Advanced Hybrid Search:** Combines FAISS-based semantic search with BM25 keyword search using Reciprocal Rank Fusion (RRF) to retrieve the most relevant information.
-- **Cross-Encoder Reranking:** Re-ranks the retrieved chunks using a cross-encoder model for optimal accuracy before feeding them to the LLM.
-- **Student Toolkit:** specialized generation modes to help students learn:
-  - Generate Document Summaries
-  - Auto-generate Multiple Choice Questions (MCQs)
-  - Create Viva (oral exam) questions and answers
-  - Extract key topics and simple explanations
-- **User Authentication:** Secure signup, login, and JWT-based session management.
+The system retrieves relevant information from uploaded documents using semantic search and keyword search, applies cross-encoder reranking, and provides grounded responses generated from the retrieved document context.
 
-## 🛠️ Technology Stack
+## Key Features
 
-- **Backend:** Python, FastAPI, SQLAlchemy (Async), FAISS, Sentence Transformers, rank_bm25
-- **Frontend:** HTML5, CSS3, Vanilla JavaScript
-- **Database:** SQLite / PostgreSQL (Configurable via SQLAlchemy)
+### Document Question Answering
 
-## 🚀 Getting Started
+Users can upload documents and ask questions about their content. The system retrieves relevant document sections and generates answers based on the available information.
 
-### Prerequisites
-- Python 3.9+
-- A modern web browser
+Responses include source references and page numbers where applicable.
 
-### 1. Backend Setup
+### Hybrid Search
 
-1. Navigate to the project root directory.
-2. Create and activate a virtual environment (recommended):
-   ```bash
-   python -m venv venv
-   # On Windows:
-   venv\Scripts\activate
-   # On macOS/Linux:
-   source venv/bin/activate
-   ```
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Configure your environment variables. Ensure the `.env` file in the root directory contains your necessary LLM API keys and configuration parameters.
-5. Start the FastAPI development server:
-   ```bash
-   uvicorn backend.main:app --reload --port 8000
-   ```
+The application combines two retrieval approaches:
 
-### 2. Frontend Setup
+* Semantic search using FAISS and Sentence Transformers
+* Keyword search using BM25
 
-The frontend consists of static files (HTML, CSS, JS). You can serve it using any basic web server.
-For example, using Python's built-in HTTP server:
+The results are combined using Reciprocal Rank Fusion (RRF) to improve retrieval quality.
 
-1. Open a new terminal and navigate to the `frontend` directory:
-   ```bash
-   cd frontend
-   ```
-2. Start the static file server (e.g., on port 3000 to avoid conflicting with the backend):
-   ```bash
-   python -m http.server 3000
-   ```
-3. Open your browser and navigate to `http://localhost:3000/index.html` (or `http://localhost:3000/dashboard.html`).
+### Cross-Encoder Reranking
 
-## 📁 Project Structure
+Retrieved document chunks are reranked using a cross-encoder model. This helps prioritize the most relevant context before it is passed to the language model.
+
+### Student Toolkit
+
+The application provides additional learning features for students:
+
+* Document summaries
+* Multiple Choice Questions (MCQs)
+* Viva questions and answers
+* Key topic extraction
+* Simple explanations of important concepts
+
+### User Authentication
+
+The application provides user authentication using:
+
+* User registration
+* Login
+* JWT-based session management
+
+## Technology Stack
+
+| Component      | Technology              |
+| -------------- | ----------------------- |
+| Backend        | Python, FastAPI         |
+| Database       | SQLite / PostgreSQL     |
+| ORM            | SQLAlchemy Async        |
+| Vector Search  | FAISS                   |
+| Embeddings     | Sentence Transformers   |
+| Keyword Search | BM25                    |
+| Frontend       | HTML5, CSS3, JavaScript |
+| Authentication | JWT                     |
+
+## RAG Architecture
+
+The application follows a multi-stage Retrieval-Augmented Generation pipeline:
 
 ```text
-├── backend/            # FastAPI application, database models, schemas, and API routes
-│   ├── rag/            # RAG implementation: retriever, vector store, embeddings, and splitter
-│   ├── database/       # SQLAlchemy models and database configuration
-│   ├── utils/          # Helper utilities
-│   └── main.py         # FastAPI application entry point
-├── frontend/           # Vanilla JS, HTML, and CSS for the web interface
-├── data/               # Default directory for uploaded files and databases
-├── vector_store/       # Persistent storage for FAISS indices and metadata
-├── requirements.txt    # Python package dependencies
-└── .env                # Environment variables (API keys, settings)
+Document Upload
+       |
+       v
+Document Parsing
+       |
+       v
+Text Chunking
+       |
+       v
+Generate Embeddings
+       |
+       +----------------------+
+       |                      |
+       v                      v
+FAISS Semantic Search    BM25 Keyword Search
+       |                      |
+       +----------+-----------+
+                  |
+                  v
+       Reciprocal Rank Fusion
+                  |
+                  v
+        Cross-Encoder Reranking
+                  |
+                  v
+        Relevant Document Context
+                  |
+                  v
+              LLM
+                  |
+                  v
+          Grounded Answer
 ```
 
-## 🧠 How it Works
+## How It Works
 
-1. **Document Upload:** Documents are parsed and split into overlapping chunks.
-2. **Embedding:** Text chunks are passed through a Sentence Transformer model (e.g., `all-MiniLM-L6-v2`) to generate vector embeddings.
-3. **Indexing:** Vectors are stored in a FAISS index, while raw text is mapped for BM25 keyword search.
-4. **Retrieval:** When a question is asked, the system performs a hybrid search (Semantic + Keyword), fuses the results, and reranks the top candidates.
-5. **Generation:** The reranked context is sent to an LLM alongside the user's query to generate an informed, highly accurate response.
+### 1. Document Upload
+
+Users upload documents through the web interface. The application extracts the document text and divides it into smaller overlapping chunks.
+
+### 2. Embedding Generation
+
+Each text chunk is converted into a numerical vector using a Sentence Transformer model such as `all-MiniLM-L6-v2`.
+
+### 3. Document Indexing
+
+The generated embeddings are stored in a FAISS vector index.
+
+The original text and metadata are also maintained for keyword-based retrieval using BM25.
+
+### 4. Hybrid Retrieval
+
+When a user submits a question, the system performs:
+
+* Semantic similarity search using FAISS
+* Keyword-based search using BM25
+
+The results from both methods are combined using Reciprocal Rank Fusion.
+
+### 5. Cross-Encoder Reranking
+
+The retrieved chunks are passed through a cross-encoder model to determine which pieces of information are most relevant to the user's question.
+
+### 6. Answer Generation
+
+The highest-ranked document chunks are provided as context to the language model along with the user's question.
+
+The model generates an answer based on the retrieved information.
+
+## Getting Started
+
+### Prerequisites
+
+* Python 3.9 or higher
+* A modern web browser
+* Required LLM API credentials
+* Git
+
+## Backend Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/KotapatiDhananjay/AI-Powered-Document-Intelligence-Assistant-using-RAG.git
+```
+
+Navigate to the project directory:
+
+```bash
+cd AI-Powered-Document-Intelligence-Assistant-using-RAG
+```
+
+### 2. Create a Virtual Environment
+
+```bash
+python -m venv venv
+```
+
+Activate the virtual environment on Windows:
+
+```powershell
+venv\Scripts\activate
+```
+
+On macOS/Linux:
+
+```bash
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
+
+Create or update the `.env` file in the project root and provide the required API keys and configuration values.
+
+Example:
+
+```text
+LLM_API_KEY=your_api_key
+```
+
+Do not commit API keys or other sensitive credentials to GitHub.
+
+### 5. Start the FastAPI Server
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+The backend will be available at:
+
+```text
+http://localhost:8000
+```
+
+## Frontend Setup
+
+The frontend consists of static HTML, CSS, and JavaScript files.
+
+Open another terminal and navigate to the frontend directory:
+
+```bash
+cd frontend
+```
+
+Start a local web server:
+
+```bash
+python -m http.server 3000
+```
+
+Open the application in your browser:
+
+```text
+http://localhost:3000/index.html
+```
+
+or:
+
+```text
+http://localhost:3000/dashboard.html
+```
+
+## Project Structure
+
+```text
+AI-Powered-Document-Intelligence-Assistant/
+│
+├── backend/
+│   ├── rag/
+│   │   ├── retriever/
+│   │   ├── vector_store/
+│   │   ├── embeddings/
+│   │   └── splitter/
+│   │
+│   ├── database/
+│   │   ├── models/
+│   │   └── database configuration
+│   │
+│   ├── utils/
+│   └── main.py
+│
+├── frontend/
+│   ├── HTML files
+│   ├── CSS files
+│   └── JavaScript files
+│
+├── data/
+│   └── Uploaded documents and database files
+│
+├── vector_store/
+│   └── FAISS indexes and metadata
+│
+├── requirements.txt
+├── .env
+└── README.md
+```
+
+## Student Learning Tools
+
+The system is designed not only for document question answering but also for academic learning.
+
+### Document Summary
+
+Generates a concise summary of the uploaded document.
+
+### Multiple Choice Questions
+
+Automatically generates MCQs based on the document content.
+
+### Viva Preparation
+
+Creates potential viva questions and answers based on the uploaded material.
+
+### Key Topics
+
+Identifies important topics and concepts from the document.
+
+### Simple Explanations
+
+Provides simplified explanations of complex topics to support learning.
+
+## Advantages
+
+* Combines semantic and keyword-based retrieval.
+* Uses reranking to improve context relevance.
+* Provides document-grounded answers.
+* Supports source and page references.
+* Provides multiple academic learning tools.
+* Supports persistent vector storage.
+* Provides authenticated user access.
+* Can work with SQLite or PostgreSQL.
+
+## Future Enhancements
+
+* Support for additional document formats.
+* Multi-document conversational search.
+* Conversation history.
+* Improved citation verification.
+* Streaming responses.
+* Role-based user access.
+* Cloud-based vector database support.
+* Advanced document visualization.
+* Support for additional embedding and LLM models.
+
+## Security Considerations
+
+* Keep API keys in environment variables.
+* Never commit `.env` files containing secrets.
+* Use secure JWT configuration in production.
+* Configure appropriate CORS policies before deployment.
+* Use HTTPS when deploying the application publicly.
+
+## License
+
+This project is developed for educational and portfolio purposes.
+
+## Author
+
+Kotapati Dhananjay
+
+GitHub: https://github.com/KotapatiDhananjay
