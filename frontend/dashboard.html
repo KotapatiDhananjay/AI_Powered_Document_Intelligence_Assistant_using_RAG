@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard — View your documents, stats, and quick actions.">
+    <title>Dashboard — DocIntel AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+    <!-- Animated Background & Noise -->
+    <div class="bg-animated"></div>
+    <div class="noise-overlay"></div>
+
+    <!-- Navigation Header -->
+    <header class="nav-header">
+        <a href="dashboard.html" class="nav-logo">
+            <div class="nav-logo-icon">🧠</div>
+            <span>DocIntel AI</span>
+        </a>
+        <nav class="nav-actions">
+            <a href="upload.html" class="btn btn-ghost btn-sm">📄 Documents</a>
+            <a href="chat.html" class="btn btn-ghost btn-sm">💬 Chat</a>
+            <div class="nav-user" id="nav-user-info">
+                <div class="nav-user-avatar" id="nav-user-avatar">U</div>
+                <span id="nav-user-name">User</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="logout-btn" title="Sign out">🚪</button>
+        </nav>
+    </header>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Dashboard Page -->
+    <main class="page active" id="page-dashboard">
+        <div class="page-content">
+
+            <!-- Welcome Header -->
+            <div class="section-header">
+                <div>
+                    <h2 id="welcome-heading">Welcome back</h2>
+                    <p style="color: var(--text-secondary); margin-top: var(--space-xs); font-size: 0.95rem;">
+                        Here's an overview of your document intelligence workspace.
+                    </p>
+                </div>
+                <div style="display: flex; gap: var(--space-md);">
+                    <a href="upload.html" class="btn btn-secondary" id="dashboard-upload-btn">📄 Upload Document</a>
+                    <a href="chat.html" class="btn btn-primary" id="dashboard-chat-btn">💬 Start Chat</a>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card glass-card stagger-1">
+                    <div class="stat-value" id="stat-documents">
+                        <div class="skeleton skeleton-text" style="width: 60px; height: 36px; margin: 0 auto;"></div>
+                    </div>
+                    <div class="stat-label">Documents</div>
+                </div>
+                <div class="stat-card glass-card stagger-2">
+                    <div class="stat-value" id="stat-questions">
+                        <div class="skeleton skeleton-text" style="width: 60px; height: 36px; margin: 0 auto;"></div>
+                    </div>
+                    <div class="stat-label">Questions Asked</div>
+                </div>
+                <div class="stat-card glass-card stagger-3">
+                    <div class="stat-value" id="stat-conversations">
+                        <div class="skeleton skeleton-text" style="width: 60px; height: 36px; margin: 0 auto;"></div>
+                    </div>
+                    <div class="stat-label">Conversations</div>
+                </div>
+            </div>
+
+            <!-- Recent Documents -->
+            <div class="section-header stagger-4" style="margin-top: var(--space-xl);">
+                <h2 style="font-size: 1.2rem;">Recent Documents</h2>
+                <a href="upload.html" class="btn btn-ghost btn-sm">View All →</a>
+            </div>
+            <div class="doc-list stagger-4" id="recent-docs-list">
+                <!-- Skeleton loading -->
+                <div class="doc-item">
+                    <div class="doc-item-info">
+                        <div class="skeleton" style="width: 40px; height: 40px; border-radius: 8px;"></div>
+                        <div style="flex: 1;">
+                            <div class="skeleton skeleton-text" style="width: 200px;"></div>
+                            <div class="skeleton skeleton-text" style="width: 120px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="doc-item">
+                    <div class="doc-item-info">
+                        <div class="skeleton" style="width: 40px; height: 40px; border-radius: 8px;"></div>
+                        <div style="flex: 1;">
+                            <div class="skeleton skeleton-text" style="width: 180px;"></div>
+                            <div class="skeleton skeleton-text" style="width: 100px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State (hidden by default) -->
+            <div id="dashboard-empty" style="display: none; text-align: center; padding: var(--space-3xl) 0;">
+                <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.5;">📭</div>
+                <h3 style="margin-bottom: var(--space-sm); color: var(--text-secondary);">No documents yet</h3>
+                <p style="color: var(--text-muted); margin-bottom: var(--space-xl);">Upload your first document to get started with AI-powered Q&A.</p>
+                <a href="upload.html" class="btn btn-primary" id="dashboard-empty-upload-btn">📄 Upload Your First Document</a>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Auth guard
+            if (!Auth.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set user info in nav
+            const user = Auth.getUser();
+            if (user) {
+                document.getElementById('nav-user-avatar').textContent = (user.username || user.email)[0].toUpperCase();
+                document.getElementById('nav-user-name').textContent = user.username || user.email;
+                document.getElementById('welcome-heading').textContent = `Welcome back, ${user.username || 'User'}`;
+            }
+
+            // Logout
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                Auth.logout();
+                window.location.href = 'login.html';
+            });
+
+            // Load dashboard data
+            try {
+                const stats = await API.get('/api/documents/stats');
+
+                // Update stats
+                document.getElementById('stat-documents').textContent = stats.total_documents;
+                document.getElementById('stat-questions').textContent = stats.total_questions;
+                document.getElementById('stat-conversations').textContent = stats.total_conversations;
+
+                // Render recent documents
+                const docList = document.getElementById('recent-docs-list');
+
+                if (stats.recent_documents.length === 0) {
+                    docList.style.display = 'none';
+                    document.getElementById('dashboard-empty').style.display = 'block';
+                } else {
+                    docList.innerHTML = stats.recent_documents.map(doc => renderDocItem(doc)).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load dashboard:', err);
+                Toast.show('Failed to load dashboard data', 'error');
+            }
+        });
+
+        function renderDocItem(doc) {
+            const icon = getFileIcon(doc.file_type);
+            const size = formatFileSize(doc.file_size);
+            const statusClass = doc.status === 'ready' ? 'ready' : doc.status === 'error' ? 'error' : 'processing';
+            const statusText = doc.status === 'ready' ? '✓ Ready' : doc.status === 'error' ? '✗ Error' : '⟳ Processing';
+
+            return `
+                <div class="doc-item">
+                    <div class="doc-item-info">
+                        <div class="doc-icon">${icon}</div>
+                        <div>
+                            <div class="doc-name">${escapeHtml(doc.original_filename)}</div>
+                            <div class="doc-meta">${size} · ${doc.total_pages} pages · ${doc.total_chunks} chunks</div>
+                        </div>
+                    </div>
+                    <span class="doc-status ${statusClass}">${statusText}</span>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

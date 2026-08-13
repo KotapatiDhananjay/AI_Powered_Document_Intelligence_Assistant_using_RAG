@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sign in to your AI Document Intelligence account to upload documents and ask questions.">
+    <title>Sign In — DocIntel AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-animated"></div>
+
+    <!-- Navigation Header -->
+    <header class="nav-header">
+        <a href="index.html" class="nav-logo">
+            <div class="nav-logo-icon">🧠</div>
+            <span>DocIntel AI</span>
+        </a>
+    </header>
+
+    <!-- Auth Page -->
+    <main class="page active" id="page-auth">
+        <div class="auth-container">
+            <div class="auth-card glass-card">
+
+                <!-- Login Form -->
+                <div id="login-form-container">
+                    <h2>Welcome Back</h2>
+                    <p class="subtitle">Sign in to your account</p>
+
+                    <form id="login-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label class="form-label" for="login-email">Email</label>
+                            <input class="form-input" type="email" id="login-email" 
+                                   placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="login-password">Password</label>
+                            <input class="form-input" type="password" id="login-password" 
+                                   placeholder="••••••••" required autocomplete="current-password">
+                        </div>
+                        <div id="login-error" class="form-error" style="display: none; margin-bottom: var(--space-md);"></div>
+                        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" id="login-submit-btn">
+                            Sign In
+                        </button>
+                    </form>
+
+                    <div class="auth-toggle">
+                        Don't have an account? <a href="#" id="show-register-link">Create one</a>
+                    </div>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-form-container" style="display: none;">
+                    <h2>Create Account</h2>
+                    <p class="subtitle">Join to start querying your documents</p>
+
+                    <form id="register-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label class="form-label" for="register-email">Email</label>
+                            <input class="form-input" type="email" id="register-email" 
+                                   placeholder="you@example.com" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="register-username">Username</label>
+                            <input class="form-input" type="text" id="register-username" 
+                                   placeholder="johndoe" required minlength="3" maxlength="100" autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="register-password">Password</label>
+                            <input class="form-input" type="password" id="register-password" 
+                                   placeholder="Min. 6 characters" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div id="register-error" class="form-error" style="display: none; margin-bottom: var(--space-md);"></div>
+                        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" id="register-submit-btn">
+                            Create Account
+                        </button>
+                    </form>
+
+                    <div class="auth-toggle">
+                        Already have an account? <a href="#" id="show-login-link">Sign in</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in
+            if (Auth.isAuthenticated()) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            // Check URL params for mode
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('mode') === 'register') {
+                toggleAuthForm('register');
+            }
+
+            // Toggle between login/register
+            document.getElementById('show-register-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleAuthForm('register');
+            });
+
+            document.getElementById('show-login-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleAuthForm('login');
+            });
+
+            // Login form submission
+            document.getElementById('login-form').addEventListener('submit', async () => {
+                const btn = document.getElementById('login-submit-btn');
+                const errorEl = document.getElementById('login-error');
+                errorEl.style.display = 'none';
+
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+
+                if (!email || !password) return;
+
+                btn.disabled = true;
+                btn.textContent = 'Signing in...';
+
+                try {
+                    await Auth.login(email, password);
+                    window.location.href = 'dashboard.html';
+                } catch (err) {
+                    errorEl.textContent = err.message || 'Login failed';
+                    errorEl.style.display = 'block';
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In';
+                }
+            });
+
+            // Register form submission
+            document.getElementById('register-form').addEventListener('submit', async () => {
+                const btn = document.getElementById('register-submit-btn');
+                const errorEl = document.getElementById('register-error');
+                errorEl.style.display = 'none';
+
+                const email = document.getElementById('register-email').value.trim();
+                const username = document.getElementById('register-username').value.trim();
+                const password = document.getElementById('register-password').value;
+
+                if (!email || !username || !password) return;
+
+                btn.disabled = true;
+                btn.textContent = 'Creating account...';
+
+                try {
+                    await Auth.register(email, username, password);
+                    window.location.href = 'dashboard.html';
+                } catch (err) {
+                    errorEl.textContent = err.message || 'Registration failed';
+                    errorEl.style.display = 'block';
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Create Account';
+                }
+            });
+        });
+
+        function toggleAuthForm(mode) {
+            const loginContainer = document.getElementById('login-form-container');
+            const registerContainer = document.getElementById('register-form-container');
+
+            if (mode === 'register') {
+                loginContainer.style.display = 'none';
+                registerContainer.style.display = 'block';
+            } else {
+                loginContainer.style.display = 'block';
+                registerContainer.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

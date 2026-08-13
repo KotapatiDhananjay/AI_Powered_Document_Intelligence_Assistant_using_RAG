@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Upload and manage your documents for AI-powered question answering.">
+    <title>Documents — DocIntel AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-animated"></div>
+
+    <!-- Navigation Header -->
+    <header class="nav-header">
+        <a href="dashboard.html" class="nav-logo">
+            <div class="nav-logo-icon">🧠</div>
+            <span>DocIntel AI</span>
+        </a>
+        <nav class="nav-actions">
+            <a href="dashboard.html" class="btn btn-ghost btn-sm">📊 Dashboard</a>
+            <a href="chat.html" class="btn btn-ghost btn-sm">💬 Chat</a>
+            <div class="nav-user" id="nav-user-info">
+                <div class="nav-user-avatar" id="nav-user-avatar">U</div>
+                <span id="nav-user-name">User</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="logout-btn" title="Sign out">🚪</button>
+        </nav>
+    </header>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal">
+            <h3>🗑️ Delete Document</h3>
+            <p style="color: var(--text-secondary);">
+                Are you sure you want to delete <strong id="delete-doc-name"></strong>? 
+                This will remove all associated chunks, embeddings, and conversation context for this document.
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="delete-cancel-btn">Cancel</button>
+                <button class="btn btn-danger" id="delete-confirm-btn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Page -->
+    <main class="page active" id="page-upload">
+        <div class="page-content">
+
+            <!-- Header -->
+            <div class="section-header">
+                <h2>📄 Documents</h2>
+            </div>
+
+            <!-- Upload Zone -->
+            <div class="upload-zone glass-card" id="upload-zone">
+                <div class="upload-zone-icon">📤</div>
+                <h3>Drop files here or click to upload</h3>
+                <p>Supported: PDF, DOCX, TXT, PPTX, CSV — Max 50MB</p>
+                <input type="file" id="file-input" 
+                       accept=".pdf,.docx,.txt,.pptx,.csv" 
+                       multiple 
+                       style="display: none;">
+
+                <!-- Upload Progress -->
+                <div class="upload-progress" id="upload-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Uploading...</div>
+                </div>
+            </div>
+
+            <!-- Document List -->
+            <div class="section-header" style="margin-top: var(--space-2xl);">
+                <h2 style="font-size: 1.2rem;">Your Documents</h2>
+                <span class="doc-meta" id="doc-count">Loading...</span>
+            </div>
+            <div class="doc-list" id="doc-list">
+                <!-- Skeleton loading -->
+                <div class="doc-item">
+                    <div class="doc-item-info">
+                        <div class="skeleton" style="width: 40px; height: 40px; border-radius: 8px;"></div>
+                        <div style="flex: 1;">
+                            <div class="skeleton skeleton-text" style="width: 200px;"></div>
+                            <div class="skeleton skeleton-text" style="width: 120px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="docs-empty" style="display: none; text-align: center; padding: var(--space-3xl) 0;">
+                <div style="font-size: 4rem; margin-bottom: var(--space-lg); opacity: 0.5;">📂</div>
+                <h3 style="margin-bottom: var(--space-sm); color: var(--text-secondary);">No documents uploaded</h3>
+                <p style="color: var(--text-muted);">Drag and drop files above or click to browse.</p>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        let deleteDocId = null;
+        let statusPollInterval = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Auth guard
+            if (!Auth.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set user info
+            const user = Auth.getUser();
+            if (user) {
+                document.getElementById('nav-user-avatar').textContent = (user.username || user.email)[0].toUpperCase();
+                document.getElementById('nav-user-name').textContent = user.username || user.email;
+            }
+
+            // Logout
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                Auth.logout();
+                window.location.href = 'login.html';
+            });
+
+            // Upload zone click
+            const uploadZone = document.getElementById('upload-zone');
+            const fileInput = document.getElementById('file-input');
+
+            uploadZone.addEventListener('click', () => fileInput.click());
+
+            // Drag and drop
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('drag-over');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('drag-over');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) handleFileUpload(files);
+            });
+
+            // File input change
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) handleFileUpload(fileInput.files);
+            });
+
+            // Delete modal
+            document.getElementById('delete-cancel-btn').addEventListener('click', closeDeleteModal);
+            document.getElementById('delete-confirm-btn').addEventListener('click', confirmDelete);
+
+            // Load documents
+            await loadDocuments();
+
+            // Start polling for processing documents
+            startStatusPolling();
+        });
+
+        async function handleFileUpload(files) {
+            const progress = document.getElementById('upload-progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+
+            for (const file of files) {
+                progress.classList.add('active');
+                progressFill.style.width = '10%';
+                progressText.textContent = `Uploading ${file.name}...`;
+
+                try {
+                    progressFill.style.width = '40%';
+                    const result = await API.upload('/api/documents/upload', file);
+                    
+                    progressFill.style.width = '100%';
+                    progressText.textContent = `${file.name} uploaded! Processing...`;
+                    
+                    Toast.show(`"${file.name}" uploaded successfully. Processing will take a moment.`, 'success');
+                    
+                    // Reload document list
+                    await loadDocuments();
+
+                    setTimeout(() => {
+                        progress.classList.remove('active');
+                        progressFill.style.width = '0%';
+                    }, 2000);
+
+                } catch (err) {
+                    progressFill.style.width = '0%';
+                    progress.classList.remove('active');
+                    Toast.show(`Failed to upload ${file.name}: ${err.message}`, 'error');
+                }
+            }
+
+            // Reset file input
+            document.getElementById('file-input').value = '';
+        }
+
+        async function loadDocuments() {
+            try {
+                const data = await API.get('/api/documents');
+                const docList = document.getElementById('doc-list');
+                const emptyState = document.getElementById('docs-empty');
+                const docCount = document.getElementById('doc-count');
+
+                docCount.textContent = `${data.total} document${data.total !== 1 ? 's' : ''}`;
+
+                if (data.documents.length === 0) {
+                    docList.style.display = 'none';
+                    emptyState.style.display = 'block';
+                } else {
+                    emptyState.style.display = 'none';
+                    docList.style.display = 'flex';
+                    docList.innerHTML = data.documents.map(doc => renderDocItem(doc)).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load documents:', err);
+                Toast.show('Failed to load documents', 'error');
+            }
+        }
+
+        function renderDocItem(doc) {
+            const icon = getFileIcon(doc.file_type);
+            const size = formatFileSize(doc.file_size);
+            const statusClass = doc.status === 'ready' ? 'ready' : doc.status === 'error' ? 'error' : 'processing';
+            
+            let statusText;
+            if (doc.status === 'ready') statusText = '✓ Ready';
+            else if (doc.status === 'error') statusText = '✗ Error';
+            else statusText = '⟳ ' + capitalizeFirst(doc.status);
+
+            const meta = doc.status === 'ready' 
+                ? `${size} · ${doc.total_pages} pages · ${doc.total_chunks} chunks`
+                : doc.status === 'error'
+                    ? `${size} · ${doc.error_message || 'Processing failed'}`
+                    : `${size} · Processing...`;
+
+            return `
+                <div class="doc-item" data-doc-id="${doc.id}" data-status="${doc.status}">
+                    <div class="doc-item-info">
+                        <div class="doc-icon">${icon}</div>
+                        <div style="min-width: 0;">
+                            <div class="doc-name">${escapeHtml(doc.original_filename)}</div>
+                            <div class="doc-meta">${meta}</div>
+                        </div>
+                    </div>
+                    <div class="doc-actions">
+                        <span class="doc-status ${statusClass}">${statusText}</span>
+                        <button class="btn btn-ghost btn-sm" onclick="openDeleteModal(${doc.id}, '${escapeHtml(doc.original_filename)}')" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function openDeleteModal(docId, docName) {
+            deleteDocId = docId;
+            document.getElementById('delete-doc-name').textContent = docName;
+            document.getElementById('delete-modal').classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            deleteDocId = null;
+            document.getElementById('delete-modal').classList.remove('active');
+        }
+
+        async function confirmDelete() {
+            if (!deleteDocId) return;
+
+            const btn = document.getElementById('delete-confirm-btn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+
+            try {
+                await API.delete(`/api/documents/${deleteDocId}`);
+                Toast.show('Document deleted', 'success');
+                closeDeleteModal();
+                await loadDocuments();
+            } catch (err) {
+                Toast.show(`Failed to delete: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Delete';
+            }
+        }
+
+        function startStatusPolling() {
+            // Poll every 5 seconds for processing documents
+            statusPollInterval = setInterval(async () => {
+                const processingDocs = document.querySelectorAll('[data-status]:not([data-status="ready"]):not([data-status="error"])');
+                if (processingDocs.length > 0) {
+                    await loadDocuments();
+                }
+            }, 5000);
+        }
+
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+    </script>
+</body>
+</html>

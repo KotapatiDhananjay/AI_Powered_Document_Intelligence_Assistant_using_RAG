@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Chat with your documents using AI — get grounded answers with source citations.">
+    <title>Chat — DocIntel AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+    <!-- Navigation Header -->
+    <header class="nav-header">
+        <a href="dashboard.html" class="nav-logo">
+            <div class="nav-logo-icon">🧠</div>
+            <span>DocIntel AI</span>
+        </a>
+        <nav class="nav-actions">
+            <a href="dashboard.html" class="btn btn-ghost btn-sm">📊 Dashboard</a>
+            <a href="upload.html" class="btn btn-ghost btn-sm">📄 Documents</a>
+            <button class="btn btn-ghost btn-sm" id="sidebar-toggle-btn" style="display: none;" title="Toggle sidebar">☰</button>
+            <div class="nav-user" id="nav-user-info">
+                <div class="nav-user-avatar" id="nav-user-avatar">U</div>
+                <span id="nav-user-name">User</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="logout-btn" title="Sign out">🚪</button>
+        </nav>
+    </header>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Chat Page -->
+    <main class="page active" id="page-chat">
+        <div class="chat-layout">
+
+            <!-- Sidebar -->
+            <aside class="chat-sidebar" id="chat-sidebar">
+
+                <!-- New Conversation -->
+                <button class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: var(--space-lg);" id="new-conversation-btn">
+                    ✨ New Conversation
+                </button>
+
+                <!-- Document Selector -->
+                <div class="chat-sidebar-title">📄 Documents</div>
+                <div id="doc-selector-list" style="margin-bottom: var(--space-lg);">
+                    <div style="color: var(--text-muted); font-size: 0.82rem; padding: var(--space-sm);">
+                        Loading documents...
+                    </div>
+                </div>
+
+                <!-- Student Mode Section -->
+                <div class="student-mode-section">
+                    <div class="chat-sidebar-title">🎓 Student Mode</div>
+                    <button class="btn btn-ghost student-btn" data-mode="summarize" title="Generate a structured document summary">
+                        📝 Summarize
+                    </button>
+                    <button class="btn btn-ghost student-btn" data-mode="mcqs" title="Generate multiple-choice questions">
+                        ❓ Generate MCQs
+                    </button>
+                    <button class="btn btn-ghost student-btn" data-mode="viva" title="Generate viva/oral exam questions">
+                        🎤 Viva Questions
+                    </button>
+                    <button class="btn btn-ghost student-btn" data-mode="explain" title="Explain topics simply">
+                        💡 Explain Simply
+                    </button>
+                    <button class="btn btn-ghost student-btn" data-mode="topics" title="Extract important topics">
+                        📌 Key Topics
+                    </button>
+                </div>
+
+                <!-- Conversation History -->
+                <div class="conv-list" id="conv-list">
+                    <div class="chat-sidebar-title">💬 History</div>
+                </div>
+
+            </aside>
+
+            <!-- Main Chat Area -->
+            <div class="chat-main">
+
+                <!-- Messages -->
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Empty State -->
+                    <div class="chat-empty" id="chat-empty">
+                        <div class="chat-empty-icon">🧠</div>
+                        <h3>AI Document Intelligence</h3>
+                        <p style="color: var(--text-muted); max-width: 400px;">
+                            Select documents from the sidebar, then ask a question. 
+                            The AI will search your documents and provide grounded answers with citations.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea class="chat-input" id="chat-input" 
+                                  placeholder="Ask a question about your documents..." 
+                                  rows="1"></textarea>
+                        <button class="chat-send-btn" id="chat-send-btn" disabled title="Send message">
+                            ➤
+                        </button>
+                    </div>
+                    <div style="text-align: center; margin-top: var(--space-xs);">
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">
+                            Press Enter to send · Shift+Enter for new line
+                        </span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        let currentConversationId = null;
+        let documents = [];
+        let isStreaming = false;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Auth guard
+            if (!Auth.isAuthenticated()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set user info
+            const user = Auth.getUser();
+            if (user) {
+                document.getElementById('nav-user-avatar').textContent = (user.username || user.email)[0].toUpperCase();
+                document.getElementById('nav-user-name').textContent = user.username || user.email;
+            }
+
+            // Logout
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                Auth.logout();
+                window.location.href = 'login.html';
+            });
+
+            // Mobile sidebar toggle
+            const sidebarToggle = document.getElementById('sidebar-toggle-btn');
+            if (window.innerWidth <= 768) sidebarToggle.style.display = 'inline-flex';
+            sidebarToggle.addEventListener('click', () => {
+                document.getElementById('chat-sidebar').classList.toggle('mobile-open');
+            });
+
+            // Chat input behavior
+            const chatInput = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send-btn');
+
+            chatInput.addEventListener('input', () => {
+                // Auto-resize
+                chatInput.style.height = 'auto';
+                chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+                // Enable/disable send
+                sendBtn.disabled = !chatInput.value.trim() || isStreaming;
+            });
+
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (chatInput.value.trim() && !isStreaming) {
+                        sendMessage();
+                    }
+                }
+            });
+
+            sendBtn.addEventListener('click', () => {
+                if (chatInput.value.trim() && !isStreaming) {
+                    sendMessage();
+                }
+            });
+
+            // New conversation
+            document.getElementById('new-conversation-btn').addEventListener('click', () => {
+                currentConversationId = null;
+                clearChat();
+            });
+
+            // Student mode buttons
+            document.querySelectorAll('.student-btn').forEach(btn => {
+                btn.addEventListener('click', () => handleStudentMode(btn.dataset.mode));
+            });
+
+            // Load documents and conversations
+            await Promise.all([loadDocuments(), loadConversations()]);
+        });
+
+        async function loadDocuments() {
+            try {
+                const data = await API.get('/api/documents');
+                documents = data.documents.filter(d => d.status === 'ready');
+                renderDocSelector();
+            } catch (err) {
+                console.error('Failed to load documents:', err);
+            }
+        }
+
+        function renderDocSelector() {
+            const container = document.getElementById('doc-selector-list');
+
+            if (documents.length === 0) {
+                container.innerHTML = `
+                    <div style="color: var(--text-muted); font-size: 0.82rem; padding: var(--space-sm);">
+                        No documents ready. <a href="upload.html">Upload one</a>.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = documents.map(doc => `
+                <div class="chat-doc-item">
+                    <input type="checkbox" id="doc-${doc.id}" value="${doc.id}" checked>
+                    <label for="doc-${doc.id}" title="${escapeHtml(doc.original_filename)}">${escapeHtml(doc.original_filename)}</label>
+                </div>
+            `).join('');
+        }
+
+        function getSelectedDocIds() {
+            const checkboxes = document.querySelectorAll('#doc-selector-list input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => parseInt(cb.value));
+        }
+
+        async function loadConversations() {
+            try {
+                const data = await API.get('/api/conversations');
+                const convList = document.getElementById('conv-list');
+
+                if (data.conversations.length === 0) {
+                    convList.innerHTML = '<div class="chat-sidebar-title">💬 History</div>';
+                    return;
+                }
+
+                convList.innerHTML = `
+                    <div class="chat-sidebar-title">💬 History</div>
+                    ${data.conversations.map(conv => `
+                        <div class="conv-item ${conv.id === currentConversationId ? 'active' : ''}" 
+                             onclick="loadConversation(${conv.id})" title="${escapeHtml(conv.title)}">
+                            ${escapeHtml(conv.title)}
+                        </div>
+                    `).join('')}
+                `;
+            } catch (err) {
+                console.error('Failed to load conversations:', err);
+            }
+        }
+
+        async function loadConversation(conversationId) {
+            try {
+                currentConversationId = conversationId;
+                clearChat();
+
+                const data = await API.get(`/api/conversations/${conversationId}`);
+
+                for (const msg of data.messages) {
+                    appendMessage(msg.role, msg.content, msg.sources);
+                }
+
+                await loadConversations();
+                scrollToBottom();
+            } catch (err) {
+                Toast.show('Failed to load conversation', 'error');
+            }
+        }
+
+        async function sendMessage() {
+            const chatInput = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send-btn');
+            const question = chatInput.value.trim();
+
+            if (!question) return;
+
+            const docIds = getSelectedDocIds();
+            if (docIds.length === 0) {
+                Toast.show('Please select at least one document', 'warning');
+                return;
+            }
+
+            // Show user message
+            appendMessage('user', question);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            sendBtn.disabled = true;
+            isStreaming = true;
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            try {
+                // Try streaming first
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Auth.getToken()}`,
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        conversation_id: currentConversationId,
+                        document_ids: docIds,
+                        stream: true,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Request failed');
+                }
+
+                removeTypingIndicator();
+
+                // Parse SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let answerEl = null;
+                let fullAnswer = '';
+                let sources = [];
+
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep the last partial line in the buffer
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const data = line.slice(6).trim();
+
+                        if (data === '[DONE]') continue;
+
+                        try {
+                            const event = JSON.parse(data);
+
+                            if (event.type === 'sources') {
+                                sources = event.data;
+                            } else if (event.type === 'token') {
+                                if (!answerEl) {
+                                    answerEl = appendMessage('assistant', '', null, true);
+                                }
+                                fullAnswer += event.data;
+                                updateMessageContent(answerEl, fullAnswer);
+                            } else if (event.type === 'done') {
+                                if (event.data && event.data.conversation_id) {
+                                    currentConversationId = event.data.conversation_id;
+                                }
+                                // Add sources to the message
+                                if (answerEl && sources.length > 0) {
+                                    appendSources(answerEl, sources);
+                                }
+                                await loadConversations();
+                            }
+                        } catch (parseErr) {
+                            // Skip malformed JSON
+                        }
+                    }
+                }
+
+                // Fallback if no answer was streamed
+                if (!answerEl) {
+                    appendMessage('assistant', 'No response received. Please try again.');
+                }
+
+            } catch (err) {
+                removeTypingIndicator();
+                appendMessage('assistant', `Error: ${err.message}`);
+            } finally {
+                isStreaming = false;
+                sendBtn.disabled = !chatInput.value.trim();
+                scrollToBottom();
+            }
+        }
+
+        async function handleStudentMode(mode) {
+            const docIds = getSelectedDocIds();
+            if (docIds.length === 0) {
+                Toast.show('Please select at least one document', 'warning');
+                return;
+            }
+
+            const modeLabels = {
+                summarize: '📝 Summarizing documents...',
+                mcqs: '❓ Generating MCQs...',
+                viva: '🎤 Generating viva questions...',
+                explain: '💡 Generating explanation...',
+                topics: '📌 Extracting key topics...',
+            };
+
+            // For explain mode, ask for a topic
+            let question = null;
+            if (mode === 'explain') {
+                question = prompt('What topic would you like explained simply?');
+                if (!question) return;
+            }
+
+            appendMessage('user', modeLabels[mode] || `Student mode: ${mode}`);
+            showTypingIndicator();
+
+            try {
+                const result = await API.post('/api/student/generate', {
+                    mode: mode,
+                    document_ids: docIds,
+                    question: question,
+                    count: 10,
+                });
+
+                removeTypingIndicator();
+                appendMessage('assistant', result.content);
+            } catch (err) {
+                removeTypingIndicator();
+                Toast.show(`Failed: ${err.message}`, 'error');
+                appendMessage('assistant', `Error generating ${mode} content: ${err.message}`);
+            }
+        }
+
+        // --- Message Rendering ---
+
+        function appendMessage(role, content, sources, returnEl) {
+            const chatMessages = document.getElementById('chat-messages');
+            const emptyState = document.getElementById('chat-empty');
+            if (emptyState) emptyState.style.display = 'none';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const avatar = role === 'user'
+                ? (Auth.getUser()?.username || 'U')[0].toUpperCase()
+                : '🧠';
+
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">${renderMarkdown(content)}</div>
+            `;
+
+            chatMessages.appendChild(messageDiv);
+
+            if (sources && sources.length > 0) {
+                appendSources(messageDiv, sources);
+            }
+
+            scrollToBottom();
+
+            if (returnEl) return messageDiv;
+        }
+
+        function updateMessageContent(messageDiv, content) {
+            const contentEl = messageDiv.querySelector('.message-content');
+            if (contentEl) {
+                contentEl.innerHTML = renderMarkdown(content);
+                scrollToBottom();
+            }
+        }
+
+        function appendSources(messageDiv, sources) {
+            const contentEl = messageDiv.querySelector('.message-content');
+            if (!contentEl) return;
+
+            // Remove existing sources container if any
+            const existing = contentEl.querySelector('.sources-container');
+            if (existing) existing.remove();
+
+            const sourcesHtml = `
+                <div class="sources-container">
+                    <div class="sources-title">📎 Sources</div>
+                    ${sources.map(src => `
+                        <div class="source-card">
+                            <span class="source-card-icon">📄</span>
+                            <span class="source-card-text">${escapeHtml(src.document_name)}</span>
+                            <span class="source-card-page">Page ${src.page_number}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            contentEl.insertAdjacentHTML('beforeend', sourcesHtml);
+        }
+
+        function showTypingIndicator() {
+            const chatMessages = document.getElementById('chat-messages');
+            const indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'message assistant';
+            indicator.innerHTML = `
+                <div class="message-avatar">🧠</div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(indicator);
+            scrollToBottom();
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        function clearChat() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = `
+                <div class="chat-empty" id="chat-empty">
+                    <div class="chat-empty-icon">🧠</div>
+                    <h3>AI Document Intelligence</h3>
+                    <p style="color: var(--text-muted); max-width: 400px;">
+                        Select documents from the sidebar, then ask a question.
+                    </p>
+                </div>
+            `;
+        }
+
+        function scrollToBottom() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-Powered Document Intelligence Assistant — Upload documents, ask questions in natural language, and get grounded answers with source citations using RAG.">
+    <title>AI Document Intelligence — RAG-Powered Q&A Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-animated"></div>
+
+    <!-- Navigation Header -->
+    <header class="nav-header" id="nav-header">
+        <a href="index.html" class="nav-logo">
+            <div class="nav-logo-icon">🧠</div>
+            <span>DocIntel AI</span>
+        </a>
+        <nav class="nav-actions" id="nav-actions-landing">
+            <a href="login.html" class="btn btn-ghost">Log In</a>
+            <a href="login.html?mode=register" class="btn btn-primary">Get Started</a>
+        </nav>
+    </header>
+
+    <!-- Landing Page -->
+    <main class="page active" id="page-landing">
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-badge">
+                <span>✨</span>
+                <span>Powered by RAG &amp; Advanced AI</span>
+            </div>
+            <h1>
+                Your Documents,<br>
+                <span class="gradient-text">Intelligently Answered</span>
+            </h1>
+            <p>
+                Upload PDFs, research papers, notes, and reports — then ask questions in natural language. 
+                Get precise, grounded answers with page-level citations, powered by Retrieval-Augmented Generation.
+            </p>
+            <div class="hero-actions">
+                <a href="login.html?mode=register" class="btn btn-primary btn-lg" id="hero-cta-start">
+                    🚀 Start Free
+                </a>
+                <a href="#features" class="btn btn-secondary btn-lg" id="hero-cta-features">
+                    Learn More ↓
+                </a>
+            </div>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="features-grid" id="features">
+            <div class="feature-card glass-card">
+                <div class="feature-icon">📄</div>
+                <h3>Multi-Format Upload</h3>
+                <p>Upload PDF, DOCX, TXT, PPTX, and CSV files. Text is automatically extracted page-by-page with metadata preserved.</p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Semantic Search</h3>
+                <p>Hybrid search combining FAISS vector similarity with BM25 keyword matching, fused via Reciprocal Rank Fusion.</p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon">🤖</div>
+                <h3>AI-Powered Answers</h3>
+                <p>LLM-generated answers grounded in your documents. Supports Gemini, OpenAI, and Groq with streaming responses.</p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon">📑</div>
+                <h3>Source Citations</h3>
+                <p>Every answer comes with precise citations — document name and page number — so you can verify and trust the response.</p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon">🎓</div>
+                <h3>Student Mode</h3>
+                <p>Generate summaries, MCQs, viva questions, and key topics from your documents. Perfect for exam preparation.</p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon">📚</div>
+                <h3>Multi-Document Q&A</h3>
+                <p>Query across multiple documents simultaneously. Compare, contrast, and synthesize information from your entire library.</p>
+            </div>
+        </section>
+
+        <!-- Tech Stack Section -->
+        <section class="hero" style="padding-top: 0;">
+            <h2 style="margin-bottom: var(--space-md); font-size: 1.3rem;">Built With</h2>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">
+                Python &bull; FastAPI &bull; LangChain &bull; FAISS &bull; Sentence Transformers &bull; SQLite &bull; JWT &bull; SSE Streaming
+            </p>
+        </section>
+
+    </main>
+
+</body>
+</html>
